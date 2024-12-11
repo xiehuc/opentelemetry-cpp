@@ -21,6 +21,7 @@
 #include "opentelemetry/ext/http/server/http_server.h"
 #include "opentelemetry/nostd/function_ref.h"
 #include "opentelemetry/nostd/string_view.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
 
 #define HTTP_PORT 19000
 
@@ -61,6 +62,8 @@ class GetEventHandler : public CustomEventHandler
     ASSERT_EQ(response.GetBody().size(), 0);
     is_called_    = true;
     got_response_ = true;
+    OTEL_INTERNAL_LOG_ERROR(
+        "on response: " << std::chrono::system_clock::now().time_since_epoch().count() / 1000000);
   }
 };
 
@@ -525,4 +528,21 @@ TEST_F(BasicCurlHttpTests, FinishInAsyncCallback)
       ASSERT_TRUE(handlers[i]->got_response_);
     }
   }
+}
+
+TEST_F(BasicCurlHttpTests, ElegantQuit)
+{
+  auto http_client = http_client::HttpClientFactory::Create();
+  std::dynamic_pointer_cast<curl::HttpClient>(http_client)->MaybeSpawnBackgroundThread();
+  auto session = http_client->CreateSession("http://127.0.0.1:19000/get/");
+  auto request = session->CreateRequest();
+  request->SetUri("get/");
+  auto handler = std::make_shared<GetEventHandler>();
+  session->SendRequest(handler);
+  OTEL_INTERNAL_LOG_ERROR(
+      "send request: " << std::chrono::system_clock::now().time_since_epoch().count() / 1000000);
+  http_client->FinishAllSessions();
+  http_client.reset();
+  ASSERT_TRUE(handler->is_called_);
+  ASSERT_TRUE(handler->got_response_);
 }
