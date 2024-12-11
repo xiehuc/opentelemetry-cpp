@@ -407,20 +407,17 @@ void HttpClient::MaybeSpawnBackgroundThread()
           }
           else if (still_running || need_wait_more)
           {
-// curl_multi_poll is added from libcurl 7.66.0, before 7.68.0, we can only wait util
-// timeout to do the rest jobs
-#if LIBCURL_VERSION_NUM >= 0x074200
-            /* wait for activity, timeout or "nothing" */
+            // curl_multi_poll is added from libcurl 7.66.0, before 7.68.0, we can only wait util
+            // timeout to do the rest jobs
+            // #if LIBCURL_VERSION_NUM >= 0x074200
+            //             /* wait for activity, timeout or "nothing" */
+            //             mc = curl_multi_poll(self->multi_handle_, nullptr, 0,
+            //                                  static_cast<int>(self->scheduled_delay_milliseconds_.count()),
+            //                                  nullptr);
+            // #else
             OTEL_INTERNAL_LOG_ERROR(
                 "begin: " << still_running << ", "
                           << std::chrono::system_clock::now().time_since_epoch().count() / 1000000);
-            mc = curl_multi_poll(self->multi_handle_, nullptr, 0,
-                                 static_cast<int>(self->scheduled_delay_milliseconds_.count()),
-                                 nullptr);
-            OTEL_INTERNAL_LOG_ERROR(
-                "end: " << still_running << ", "
-                        << std::chrono::system_clock::now().time_since_epoch().count() / 1000000);
-#else
             mc = curl_multi_wait(self->multi_handle_, nullptr, 0,
                                  static_cast<int>(self->scheduled_delay_milliseconds_.count()),
                                  nullptr);
@@ -428,7 +425,10 @@ void HttpClient::MaybeSpawnBackgroundThread()
                       still_running == 0 && wait_for.count() > 0
                           ? static_cast<long>(self->scheduled_delay_milliseconds_.count())
                           : 0);
-#endif
+            OTEL_INTERNAL_LOG_ERROR(
+                "end: " << still_running << ", "
+                        << std::chrono::system_clock::now().time_since_epoch().count() / 1000000);
+            // #endif
           }
 
           do
